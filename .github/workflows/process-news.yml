@@ -1,0 +1,168 @@
+name: Process News
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      news_url:
+        description: 'ニュースURL'
+        required: true
+
+jobs:
+  process-news:
+    if: contains(github.event.issue.labels.*.name, 'news-processing') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: |
+        npm init -y
+        npm install axios cheerio openai
+    
+    - name: Process News
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        node << 'EOF'
+        const axios = require('axios');
+        const cheerio = require('cheerio');
+        const fs = require('fs');
+        const path = require('path');
+        const OpenAI = require('openai');
+        
+        const openai = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY
+        });
+        
+        async function processNews() {
+          try {
+            // URLを取得
+            let newsUrl;
+            if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+              newsUrl = '${{ github.event.inputs.news_url }}';
+            } else {
+              const issueBody = `${{ github.event.issue.body }}`;
+              const urlMatch = issueBody.match(/URL:\s*(https?:\/\/[^\s]+)/);
+              newsUrl = urlMatch ? urlMatch[1] : null;
+            }
+            
+            if (!newsUrl) {
+              console.log('URLが見つかりません');
+              return;
+            }
+            
+            console.log('処理中のURL:', newsUrl);
+            
+            // ニュース記事を取得
+            const response = await axios.get(newsUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+              }
+            });
+            
+            const $ = cheerio.load(response.data);
+            
+            // タイトルと日付を抽出
+            const title = $('title').text().trim() || 
+                         $('h1').first().text().trim() || 
+                         'タイトル不明';
+            
+            const publishDate = $('time').attr('datetime') || 
+                               $('[datetime]').attr('datetime') || 
+                               new Date().toISOString().split('T')[0];
+            
+            // 記事本文を抽出（簡易版）
+            const content = $('article').text() || 
+                           $('main').text() || 
+                           $('body').text();
+            
+            const summary = content.substring(0, 500);
+            
+            // OpenAI APIでキャッチーなコメントを生成
+            const completion = await openai.chat.completions.create({
+              model: "gpt-3.5-turbo",
+              messages: [{
+                role: "user",
+                content: `以下のニュース記事について、読者の興味を引く簡潔で魅力的なコメント（50文字以内）を日本語で生成してください。\n\nタイトル: ${title}\n内容: ${summary}`
+              }],
+              max_tokens: 100
+            });
+            
+            const catchyComment = completion.choices[0].message.content.trim();
+            
+            // カテゴリを自動分類
+            const categoryCompletion = await openai.chat.completions.create({
+              model: "gpt-3.5-turbo",
+              messages: [{
+                role: "user",
+                content: `以下のニュースタイトルを「technology」「business」「sports」「general」のいずれかに分類してください。単語のみで回答してください。\n\nタイトル: ${title}`
+              }],
+              max_tokens: 10
+            });
+            
+            const category = categoryCompletion.choices[0].message.content.trim().toLowerCase();
+            const validCategory = ['technology', 'business', 'sports', 'general'].includes(category) ? category : 'general';
+            
+            // Markdownエントリを作成
+            const newsEntry = `
+## ${title}
+**日付:** ${publishDate}  
+**リンク:** [記事を読む](${newsUrl})  
+**コメント:** ${catchyComment}
+
+---
+`;
+            
+            // カテゴリファイルに追加
+            const categoryFile = path.join('news', `${validCategory}.md`);
+            let existingContent = '';
+            
+            if (fs.existsSync(categoryFile)) {
+              existingContent = fs.readFileSync(categoryFile, 'utf8');
+            } else {
+              const categoryNames = {
+                'technology': 'テクノロジー',
+                'business': 'ビジネス', 
+                'sports': 'スポーツ',
+                'general': '一般'
+              };
+              existingContent = `# ${categoryNames[validCategory]}\n\n`;
+            }
+            
+            // 新しいエントリを先頭に追加
+            const lines = existingContent.split('\n');
+            const headerIndex = lines.findIndex(line => line.startsWith('# '));
+            if (headerIndex !== -1) {
+              lines.splice(headerIndex + 2, 0, newsEntry);
+            } else {
+              lines.unshift(newsEntry);
+            }
+            
+            fs.writeFileSync(categoryFile, lines.join('\n'));
+            
+            console.log(`ニュースが ${validCategory} カテゴリに追加されました`);
+            
+          } catch (error) {
+            console.error('エラー:', error.message);
+            process.exit(1);
+          }
+        }
+        
+        processNews();
+        EOF
+    
+    - name: Commit changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add news/
+        git commit -m "Add new news article" || exit 0
+        git push

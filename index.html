@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ニュースWiki</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📰 ニュースWiki</h1>
+        
+        <div class="input-section">
+            <h2>ニュース追加</h2>
+            <input type="url" id="newsUrl" placeholder="ニュースのURLを入力してください" required>
+            <button onclick="addNews()">追加</button>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="categories">
+            <h2>カテゴリ別ニュース</h2>
+            <div class="category-buttons">
+                <button onclick="loadCategory('technology')">テクノロジー</button>
+                <button onclick="loadCategory('business')">ビジネス</button>
+                <button onclick="loadCategory('sports')">スポーツ</button>
+                <button onclick="loadCategory('general')">一般</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="markdown-viewer" id="markdownContent">
+                <p>カテゴリを選択してニュースを表示してください</p>
+            </div>
+            <button id="downloadBtn" onclick="downloadMarkdown()" style="display:none;">Markdownダウンロード</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
