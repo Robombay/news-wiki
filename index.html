@@ -10,6 +10,17 @@
     <div class="container">
         <h1>📰 ニュースWiki</h1>
         
+        <div class="usage-section">
+            <h2>📖 使い方</h2>
+            <ol>
+                <li><strong>ニュースURL入力:</strong> 気になるニュース記事のURLを入力して「追加」ボタンをクリック</li>
+                <li><strong>自動処理:</strong> AIが記事を解析してキャッチーなコメントを生成し、カテゴリに自動分類</li>
+                <li><strong>確認:</strong> 数分後にカテゴリボタンをクリックして追加されたニュースを確認</li>
+                <li><strong>ダウンロード:</strong> 「Markdownダウンロード」でファイルを保存</li>
+            </ol>
+            <p><strong>💡 ヒント:</strong> 処理には2-3分かかります。GitHub Actionsの実行状況は<a href="#" id="actionsLink" target="_blank">こちら</a>で確認できます。</p>
+        </div>
+        
         <div class="input-section">
             <h2>ニュース追加</h2>
             <input type="url" id="newsUrl" placeholder="ニュースのURLを入力してください" required>
@@ -20,7 +31,11 @@
 
         <div class="categories">
             <h2>カテゴリ別ニュース</h2>
-            <div class="category-buttons">
+            <div class="category-management">
+                <input type="text" id="newCategory" placeholder="新しいカテゴリ名">
+                <button onclick="addCategory()">カテゴリ追加</button>
+            </div>
+            <div class="category-buttons" id="categoryButtons">
                 <button onclick="loadCategory('technology')">テクノロジー</button>
                 <button onclick="loadCategory('business')">ビジネス</button>
                 <button onclick="loadCategory('sports')">スポーツ</button>

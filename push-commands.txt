@@ -1,0 +1,7 @@
+# GitHubリポジトリ作成後に実行するコマンド
+# YOUR_USERNAMEを実際のGitHubユーザー名に置き換えてください
+
+cd "c:\Users\PCEX1467\Documents\AWSおべんきょう\news-wiki"
+git remote add origin https://github.com/YOUR_USERNAME/news-wiki.git
+git branch -M main
+git push -u origin main
