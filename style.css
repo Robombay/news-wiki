@@ -101,44 +101,7 @@ button:hover {
     border: 1px solid #f5c6cb;
 }
 
-.categories {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
 
-.category-management {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #eee;
-}
-
-#newCategory {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.category-buttons {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.category-buttons button {
-    margin: 0;
-    background: #95a5a6;
-}
-
-.category-buttons button:hover {
-    background: #7f8c8d;
-}
 
 .content {
     background: white;
