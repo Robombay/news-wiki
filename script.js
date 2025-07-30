@@ -27,7 +27,7 @@ async function processNews() {
             document.getElementById('downloadBtn').style.display = 'block';
             showStatus('✅ 処理が完了しました！', 'success');
         } else {
-            showStatus('処理に失敗しました', 'error');
+            showStatus('処理に失敗しました（詳細はコンソールを確認）', 'error');
         }
         
         document.getElementById('newsUrl').value = '';
@@ -35,25 +35,70 @@ async function processNews() {
         
     } catch (error) {
         processingUrls.delete(url);
+        console.error('処理エラー詳細:', error);
         showStatus('エラーが発生しました: ' + error.message, 'error');
     }
 }
 
 // 直接ニュース処理
 async function processNewsDirectly(url) {
-    try {
-        // CORSプロキシを使用してニュースを取得
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        const data = await response.json();
-        
-        if (!data.contents) {
-            throw new Error('ページの取得に失敗しました');
+    const proxies = [
+        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://cors-anywhere.herokuapp.com/${url}`
+    ];
+    
+    for (let i = 0; i < proxies.length; i++) {
+        try {
+            console.log(`プロキシ ${i + 1} を試行:`, proxies[i]);
+            
+            const response = await fetch(proxies[i]);
+            console.log('レスポンス状態:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            let data, contents;
+            
+            if (i === 0) { // allorigins
+                data = await response.json();
+                contents = data.contents;
+                console.log('alloriginsデータ:', {
+                    status: data.status,
+                    contents_length: contents ? contents.length : 0
+                });
+            } else { // 他のプロキシ
+                contents = await response.text();
+                console.log('プロキシデータ長:', contents.length);
+            }
+            
+            if (!contents || contents.length < 100) {
+                throw new Error('コンテンツが空または不十分');
+            }
+            
+            return await parseNewsContent(contents, url);
+            
+        } catch (error) {
+            console.error(`プロキシ ${i + 1} エラー:`, error.message);
+            if (i === proxies.length - 1) {
+                throw new Error('すべてのプロキシで失敗しました');
+            }
         }
-        
+    }
+}
+
+// ニュースコンテンツ解析
+async function parseNewsContent(contents, url) {
+    try {
         // HTMLをパース
         const parser = new DOMParser();
-        const doc = parser.parseFromString(data.contents, 'text/html');
+        const doc = parser.parseFromString(contents, 'text/html');
+        console.log('パース結果:', {
+            title_elements: doc.querySelectorAll('title').length,
+            h1_elements: doc.querySelectorAll('h1').length,
+            time_elements: doc.querySelectorAll('time').length
+        });
         
         // タイトルを抽出
         const title = doc.querySelector('title')?.textContent?.trim() ||
@@ -88,8 +133,12 @@ async function processNewsDirectly(url) {
         return markdown;
         
     } catch (error) {
-        console.error('処理エラー:', error);
-        return null;
+        console.error('パースエラー詳細:', {
+            message: error.message,
+            url: url,
+            stack: error.stack
+        });
+        throw error;
     }
 }
 
