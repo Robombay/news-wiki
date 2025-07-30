@@ -43,16 +43,20 @@ async function processNews() {
 // 直接ニュース処理
 async function processNewsDirectly(url) {
     const proxies = [
-        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
         `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        `https://cors-anywhere.herokuapp.com/${url}`
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+        // 簡易フォールバック: 直接アクセスを試行
+        url
     ];
     
     for (let i = 0; i < proxies.length; i++) {
         try {
             console.log(`プロキシ ${i + 1} を試行:`, proxies[i]);
             
-            const response = await fetch(proxies[i]);
+            const response = await fetch(proxies[i], {
+                timeout: 10000 // 10秒タイムアウト
+            });
             console.log('レスポンス状態:', response.status, response.statusText);
             
             if (!response.ok) {
@@ -61,16 +65,29 @@ async function processNewsDirectly(url) {
             
             let data, contents;
             
-            if (i === 0) { // allorigins
-                data = await response.json();
-                contents = data.contents;
-                console.log('alloriginsデータ:', {
-                    status: data.status,
-                    contents_length: contents ? contents.length : 0
-                });
-            } else { // 他のプロキシ
+            if (i === 2) { // allorigins
+                const responseText = await response.text();
+                console.log('生レスポンス:', responseText.substring(0, 200));
+                
+                try {
+                    data = JSON.parse(responseText);
+                    contents = data.contents;
+                    console.log('alloriginsデータ:', {
+                        status: data.status,
+                        contents_length: contents ? contents.length : 0
+                    });
+                } catch (jsonError) {
+                    console.error('JSONパースエラー:', jsonError.message);
+                    throw new Error(`JSONパース失敗: ${responseText.substring(0, 100)}`);
+                }
+            } else { // 他のプロキシまたは直接アクセス
                 contents = await response.text();
-                console.log('プロキシデータ長:', contents.length);
+                console.log(`プロキシ ${i + 1} データ長:`, contents.length);
+                
+                // 直接アクセスの場合、CORSエラーをチェック
+                if (i === proxies.length - 1 && contents.includes('CORS')) {
+                    throw new Error('CORSエラー: プロキシが必要です');
+                }
             }
             
             if (!contents || contents.length < 100) {
@@ -80,10 +97,12 @@ async function processNewsDirectly(url) {
             return await parseNewsContent(contents, url);
             
         } catch (error) {
-            console.error(`プロキシ ${i + 1} エラー:`, error.message);
+            console.error(`プロキシ ${i + 1} (${proxies[i]}) エラー:`, error.message);
             if (i === proxies.length - 1) {
-                throw new Error('すべてのプロキシで失敗しました');
+                throw new Error(`すべてのプロキシで失敗: 最後のエラー - ${error.message}`);
             }
+            // 次のプロキシを試す前に少し待機
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
 }
